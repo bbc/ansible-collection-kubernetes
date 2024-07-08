@@ -11,12 +11,12 @@ ADD . /ansible-collection-kubernetes
 #     docker build --build-arg REPO_COLLECTION_CONTAINERS=git+https://github.com/my-repo/my-collection.git,my-branch
 #
 ARG REPO_COLLECTION_CONTAINERS=git+https://github.com/vexxhost/ansible-collection-containers.git
-ARG REPO_COLLECTION_KUBERNETES=git+https://github.com/vexxhost/ansible-collection-kubernetes.git
+ARG REPO_COLLECTION_KUBERNETES=git+file:///ansible-collection-kubernetes
 
 RUN ansible-galaxy collection install $REPO_COLLECTION_CONTAINERS
 RUN ansible-galaxy collection install $REPO_COLLECTION_KUBERNETES
 
-RUN ansible-playbook -i localhost, /ansible-collection-kubernetes/playbooks/image_manifest.yml -e ansible_connection=local -e manifest_dest=/tmp/image_manifest.yaml
+RUN ansible-playbook -i localhost, vexxhost.kubernetes.image_manifest -e ansible_connection=local -e manifest_dest=/tmp/image_manifest.yaml
 # Result in /tmp/image_manifest.yaml
 
 FROM alpine:3.17 AS registry-base
