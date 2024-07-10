@@ -16,7 +16,11 @@ ARG REPO_COLLECTION_KUBERNETES=git+file:///ansible-collection-kubernetes
 RUN ansible-galaxy collection install $REPO_COLLECTION_CONTAINERS
 RUN ansible-galaxy collection install $REPO_COLLECTION_KUBERNETES
 
-RUN ansible-playbook -i localhost, vexxhost.kubernetes.image_manifest -e ansible_connection=local -e manifest_dest=/tmp/image_manifest.yaml
+RUN ansible-playbook -i localhost, vexxhost.kubernetes.image_manifest -e ansible_connection=local \
+      -e manifest_dest=/tmp/image_manifest.yaml \
+      -e download_artifact_http_proxy=$HTTP_PROXY \
+      -e download_artifact_https_proxy=$HTTP_PROXY \
+      -e download_artifact_no_proxy=$NO_PROXY
 # Result in /tmp/image_manifest.yaml
 
 FROM alpine:3.17 AS registry-base
