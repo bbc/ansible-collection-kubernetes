@@ -36,5 +36,6 @@ dependencies:
     download_artifact_url: "{{ kubectl_download_url }}"
     download_artifact_dest: "{{ kubectl_download_dest }}"
     download_artifact_checksum: "sha256:{{ kubectl_binary_checksum }}"
+    download_artifact_mirror_version: "{{ kubectl_version }}"
     download_artifact_owner: root
     download_artifact_mode: "0755"

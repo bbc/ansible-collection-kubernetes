@@ -33,5 +33,6 @@ dependencies:
     download_artifact_url: "{{ clusterctl_download_url }}"
     download_artifact_dest: "{{ clusterctl_download_dest }}"
     download_artifact_checksum: "sha256:{{ clusterctl_binary_checksum }}"
+    download_artifact_mirror_version: "{{ clusterctl_version }}"
     download_artifact_owner: root
     download_artifact_mode: "0755"
