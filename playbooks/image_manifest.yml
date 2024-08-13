@@ -96,7 +96,7 @@
 
         - name: List container imaged required by each kubeadm binary
           ansible.builtin.command:
-            cmd: "{{ item.dest }} config images list"
+            cmd: "{{ item.dest }} config images list --kubernetes-version {{ item.version }}"
           with_items: "{{ _kubeadm_binaries.downloads }}"
           changed_when: false
           register: _kubeadm_config_images_list_output
