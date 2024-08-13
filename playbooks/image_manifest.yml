@@ -114,7 +114,7 @@
 
         - name: Find all images referenced in helm charts
           ansible.builtin.shell:
-            cmd: set -o pipefail && helm template . | grep ' image:' | uniq | cut -d ':' -f 2- | tr -d '"[:blank:]'
+            cmd: set -o pipefail && helm template . | grep ' image:' | uniq | cut -d ':' -f 2- | tr -d '"[:blank:]' | cut -d '@' -f 1
             chdir: "{{ item }}"
             executable: /usr/bin/bash
           with_items: "{{ chart_paths.files | map(attribute='path') }}"
@@ -136,7 +136,7 @@
 
         - name: Find all images referenced in cluster api providers
           ansible.builtin.shell:
-            cmd: set -o pipefail && cat "{{ item }}" | grep ' image:' | uniq | cut -d ':' -f 2- | tr -d '"[:blank:]'
+            cmd: set -o pipefail && cat "{{ item }}" | grep ' image:' | uniq | cut -d ':' -f 2- | tr -d '"[:blank:]' | cut -d '@' -f 1
             executable: /usr/bin/bash
           with_items: "{{ provider_paths.files | map(attribute='path') }}"
           changed_when: false
