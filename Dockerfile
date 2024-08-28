@@ -51,7 +51,7 @@ RUN <<EOF
     sleep 0.1
   done
 
-  magnum-cluster-api-image-loader --manifest /etc/docker-registry/image_manifest.yaml --insecure --repository localhost:5000
+  magnum-cluster-api-image-loader --images_manifest /etc/docker-registry/image_manifest.yaml --insecure --repository localhost:5000
 EOF
 # Result in /var/lib/registry/*
 
