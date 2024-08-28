@@ -18,6 +18,14 @@
   vars:
     role_location: "{{ playbook_dir }}/../roles"
 
+    image_name_rules:
+      - pattern: 'docker.io/calico'
+        replace: '{repository}/calico'
+      - pattern: 'quay.io/cilium'
+        replace: '{repository}/cilium'
+      - pattern: '.+(?=\/)'
+        replace: '{repository}'
+
     all_var_images: "{{ query('vars', *q('varnames', '_image$') | flatten(levels=1)) | unique | select }}"
 
     all_chart_images: "{{ _chart_images_helm_output.results | map(attribute='stdout_lines') | flatten | unique | select }}"
@@ -33,6 +41,7 @@
     autoscaler_images: "{{ autoscaler_image_templates | map('regex_replace', '\\$image_repository', autoscaler_image_repository) }}"
 
     all_images: "{{ (all_var_images + all_chart_images + all_provider_images + all_kubeadm_images + autoscaler_images) | unique }}"
+
 
    # some role defaults use vars only defined in the download_artifact role
     _download_artifact_goarch_groups:
@@ -192,14 +201,19 @@
       ansible.builtin.debug:
         var: autoscaler_images
 
-    - name: Print complete list of images
+    - name: Print complete list of images and rules
+      vars:
+        _all_images:
+          images: "{{ all_images }}"
+          rules: "{{ image_name_rules }}"
       ansible.builtin.debug:
-        var: all_images
+        var: _all_images
 
     - name: Create output manifest file
       vars:
         _all_images:
           images: "{{ all_images }}"
+          rules: "{{ image_name_rules }}"
       ansible.builtin.template:
         dest: "{{ manifest_dest }}"
         src: image_manifest.j2
