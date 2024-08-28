@@ -50,7 +50,7 @@
         download_artifact_url: "{{ item.url }}"
         download_artifact_dest: "{{ item.dest }}"
         download_artifact_checksum: "sha256:{{ item.checksum }}"
-        download_artifact_owner: root
+        download_artifact_owner: "{{ ansible_user }}"
         download_artifact_mode: "0755"
         download_artifact_unarchive: false
         download_artifact_no_log: false
