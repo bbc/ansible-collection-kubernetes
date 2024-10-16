@@ -1,0 +1,208 @@
+# Copyright (c) 2024 BBC R&D
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+- name: Generate image manifest for all roles
+  hosts: "{{ target | default('all') }}"
+  gather_facts: false
+  vars:
+    role_location: "{{ playbook_dir }}/../roles"
+
+    all_var_images: "{{ query('vars', *q('varnames', '_image$') | flatten(levels=1)) | unique | select }}"
+
+    all_chart_images: "{{ _chart_images_helm_output.results | map(attribute='stdout_lines') | flatten | unique | select }}"
+
+    all_provider_images: "{{ _provider_images_output.results | map(attribute='stdout_lines') | flatten | unique | select }}"
+
+    all_kubeadm_images: "{{ _kubeadm_config_images_list_output.results | map(attribute='stdout_lines') | flatten | unique | select }}"
+
+    mcapi_config_options: "{{ _mcapi_config_options.stdout | from_yaml }}"
+    mcapi_autoscaler_config_options: "{{ mcapi_config_options['options']['auto_scaling']['opts'] }}"
+    autoscaler_image_repository: "{{ mcapi_autoscaler_config_options | selectattr('name', 'equalto', 'image_repository') | map(attribute='default') | first }}"
+    autoscaler_image_templates: "{{ mcapi_autoscaler_config_options | selectattr('name', 'contains', '_image') | map(attribute='default') }}"
+    autoscaler_images: "{{ autoscaler_image_templates | map('regex_replace', '\\$image_repository', autoscaler_image_repository) }}"
+
+    all_images: "{{ (all_var_images + all_chart_images + all_provider_images + all_kubeadm_images + autoscaler_images) | unique }}"
+
+   # some role defaults use vars only defined in the download_artifact role
+    _download_artifact_goarch_groups:
+      x86_64: amd64
+      aarch64: arm64
+      armv7l: arm
+
+    download_artifact_goarch: >-
+      {%- if ansible_facts['architecture'] in _download_artifact_goarch_groups -%}
+      {{ _download_artifact_goarch_groups[ansible_facts['architecture']] }}
+      {%- else -%}
+      {{ ansible_facts['architecture'] }}
+      {%- endif -%}
+
+    download_artifact_work_directory: /var/lib/downloads
+  tasks:
+
+    - name: Enumerate images
+      delegate_to: localhost
+      block:
+        - name: Gather minimal facts
+          ansible.builtin.setup:
+            gather_subset: min
+
+        ###############
+        # LOAD VARS
+        ###############
+        - name: Find all subdirectories in the role location
+          ansible.builtin.find:
+            file_type: directory
+            paths: "{{ role_location }}"
+            recurse: true
+          register: role_paths
+
+        - name: Select only defaults/ directories and load vars
+          ansible.builtin.include_vars:
+            dir: "{{ item.path }}"
+          with_items: "{{ role_paths.files | selectattr('path', 'search', 'defaults') }}"
+
+        ###############
+        # KUBEADM
+        ###############
+        - name: Generate list of all kubeadm versions
+          vexxhost.containers.binary_downloads:
+            prefixes:
+              - "kubeadm"
+          register: _kubeadm_binaries
+
+        - name: Use download_artifact to get all kubeadm binaries
+          ansible.builtin.include_role:
+            name: vexxhost.containers.download_artifact
+          vars:
+            download_artifact_url: "{{ item.url }}"
+            download_artifact_dest: "{{ item.dest }}"
+            download_artifact_checksum: "sha256:{{ item.checksum }}"
+            download_artifact_owner: root
+            download_artifact_mode: "0755"
+            download_artifact_unarchive: false
+            download_artifact_no_log: false
+          with_items: "{{ _kubeadm_binaries.downloads }}"
+
+        - name: List container imaged required by each kubeadm binary
+          ansible.builtin.command:
+            cmd: "{{ item.dest }} config images list"
+          with_items: "{{ _kubeadm_binaries.downloads }}"
+          changed_when: false
+          register: _kubeadm_config_images_list_output
+
+        ###############
+        # HELM
+        ###############
+        - name: Install helm
+          ansible.builtin.include_role:
+            name: vexxhost.kubernetes.helm
+
+        # images in helm charts
+        - name: Find all chart directories in the role location
+          ansible.builtin.find:
+            file_type: directory
+            paths: "{{ role_location }}"
+            recurse: true
+            patterns:
+              - 'chart'
+          register: chart_paths
+
+        - name: Find all images referenced in helm charts
+          ansible.builtin.shell:
+            cmd: set -o pipefail && helm template . | grep ' image:' | uniq | cut -d ':' -f 2- | tr -d '"[:blank:]'
+            chdir: "{{ item }}"
+            executable: /usr/bin/bash
+          with_items: "{{ chart_paths.files | map(attribute='path') }}"
+          changed_when: false
+          register: _chart_images_helm_output
+
+        ###############
+        # CAPI
+        ###############
+        # images in cluster api providers
+        - name: Find all provider directories in the role location
+          ansible.builtin.find:
+            paths: "{{ role_location }}/cluster_api/files"
+            recurse: true
+            patterns:
+              - '*.yaml'
+            exclude: "metadata.yaml"
+          register: provider_paths
+
+        - name: Find all images referenced in cluster api providers
+          ansible.builtin.shell:
+            cmd: set -o pipefail && cat "{{ item }}" | grep ' image:' | uniq | cut -d ':' -f 2- | tr -d '"[:blank:]'
+            executable: /usr/bin/bash
+          with_items: "{{ provider_paths.files | map(attribute='path') }}"
+          changed_when: false
+          register: _provider_images_output
+
+        ###############
+        # MCAPI
+        ###############
+        # images in magnum-cluster-api
+        - name: Ensure python3-virtualenv is present
+          ansible.builtin.package:
+            name: python3-virtualenv
+
+        - name: Install magnum-cluster-api
+          ansible.builtin.pip:
+            #name: magnum-cluster-api
+            name: git+https://github.com/vexxhost/magnum-cluster-api@main
+            virtualenv: '/tmp/image_manifest_venv'
+
+        - name: Get mcapi config options
+          ansible.builtin.command:
+            argv:
+              - /tmp/image_manifest_venv/bin/oslo-config-generator
+              - --namespace
+              - magnum_cluster_api
+              - --format
+              - yaml
+          register: _mcapi_config_options
+
+    - name: Print provider images
+      ansible.builtin.debug:
+        var: all_provider_images
+
+    - name: Print ansible var images
+      ansible.builtin.debug:
+        var: all_var_images
+
+    - name: Print all helm chart images
+      ansible.builtin.debug:
+        var: all_chart_images
+
+    - name: Print all kubeadm images
+      ansible.builtin.debug:
+        var: all_kubeadm_images
+
+    - name: Print all autoscaler images
+      ansible.builtin.debug:
+        var: autoscaler_images
+
+    - name: Print complete list of images
+      ansible.builtin.debug:
+        var: all_images
+
+    - name: Create output manifest file
+      vars:
+        _all_images:
+          images: "{{ all_images }}"
+      ansible.builtin.template:
+        dest: "{{ manifest_dest }}"
+        src: image_manifest.j2
+        owner: root
+        mode: '0644'
+      when: manifest_dest is defined

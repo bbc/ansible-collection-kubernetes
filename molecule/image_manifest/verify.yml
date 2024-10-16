@@ -1,0 +1,51 @@
+# Copyright (c) 2024 BBC R&D
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+- name: Verify
+  hosts: all
+  become: true
+  vars:
+    dir: /var/lib/downloads
+  tasks:
+    - name: "Read manifest file"
+      ansible.builtin.shell: "cat /tmp/manifest.yml"
+      register: result
+
+    - name: "Parse yml into variable"
+      set_fact:
+        manifest: "{{ result.stdout | from_yaml }}"
+
+    - ansible.builtin.assert:
+        that:
+          - manifest.images is defined
+          - manifest.images | select('search', 'keepalived') | length > 0
+          - manifest.images | select('search', 'cilium/cilium') | length > 0
+          - manifest.images | select('search', 'cilium/operator-generic') | length > 0
+          - manifest.images | select('search', 'kube-vip/kube-vip') | length > 0
+          - manifest.images | select('search', 'library/haproxy') | length > 0
+          - manifest.images | select('search', 'jetstack/cert-manager-cainjector') | length > 0
+          - manifest.images | select('search', 'jetstack/cert-manager-controller') | length > 0
+          - manifest.images | select('search', 'jetstack/cert-manager-webhook') | length > 0
+          - manifest.images | select('search', 'jetstack/cert-manager-ctl') | length > 0
+          - manifest.images | select('search', 'cluster-api/kubeadm-control-plane-controller') | length > 0
+          - manifest.images | select('search', 'cluster-api/kubeadm-bootstrap-controller') | length > 0
+          - manifest.images | select('search', 'capi-openstack/capi-openstack-controller') | length > 0
+          - manifest.images | select('search', 'pause') | length > 0
+          - manifest.images | select('search', 'kube-controller-manager') | length > 0
+          - manifest.images | select('search', 'kube-scheduler') | length > 0
+          - manifest.images | select('search', 'coredns/coredns') | length > 0
+          - manifest.images | select('search', 'kube-apiserver') | length > 0
+          - manifest.images | select('search', 'kube-controller-manager') | length > 0
+          - manifest.images | select('search', 'kube-scheduler') | length > 0
+          - manifest.images | select('search', 'kube-proxy') | length > 0
