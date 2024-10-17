@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-FROM python:3.10 AS ansible-runner
+FROM python:3.11 AS ansible-runner
 
 RUN pip install ansible
 

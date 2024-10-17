@@ -165,9 +165,14 @@
           ansible.builtin.package:
             name: python3-virtualenv
 
+        - name: Upgrade setuptools
+          ansible.builtin.pip:
+            name: setuptools
+            state: latest
+            virtualenv: '/tmp/image_manifest_venv'
+
         - name: Install magnum-cluster-api
           ansible.builtin.pip:
-            #name: magnum-cluster-api
             name: git+https://github.com/vexxhost/magnum-cluster-api@main
             virtualenv: '/tmp/image_manifest_venv'
 
