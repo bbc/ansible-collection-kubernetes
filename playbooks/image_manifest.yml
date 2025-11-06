@@ -173,7 +173,7 @@
 
         - name: Install magnum-cluster-api
           ansible.builtin.pip:
-            name: git+https://github.com/vexxhost/magnum-cluster-api@main
+            name: git+https://github.com/vexxhost/magnum-cluster-api@v1.14.3
             virtualenv: '/tmp/image_manifest_venv'
 
         - name: Get mcapi config options
